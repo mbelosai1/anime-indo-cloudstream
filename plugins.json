@@ -1,0 +1,46 @@
+[
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=otakudesu.blog&sz=%size%",
+        "fileHash": "sha256-4d702ae882bcefa9817c5ea17dade258010bb84ae6cce54fdfcdbc872264ea6e",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/mbelosai1/anime-indo-cloudstream",
+        "fileSize": 18349,
+        "status": 1,
+        "language": "id",
+        "authors": [
+            "hasanmbelos"
+        ],
+        "tvTypes": [
+            "Anime",
+            "AnimeMovie",
+            "OVA"
+        ],
+        "version": 1,
+        "internalName": "Otakudesu",
+        "description": "Nonton anime sub indo dari Otakudesu",
+        "url": "https://raw.githubusercontent.com/mbelosai1/anime-indo-cloudstream/builds/Otakudesu.cs3",
+        "name": "Otakudesu"
+    },
+    {
+        "iconUrl": "https://www.google.com/s2/favicons?domain=v2.samehadaku.how&sz=%size%",
+        "fileHash": "sha256-2a0d56455bf723dd315688c3db1cc704400236ff3f62b391affe083fe50beb16",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/mbelosai1/anime-indo-cloudstream",
+        "fileSize": 18045,
+        "status": 1,
+        "language": "id",
+        "authors": [
+            "hasanmbelos"
+        ],
+        "tvTypes": [
+            "Anime",
+            "AnimeMovie",
+            "OVA"
+        ],
+        "version": 4,
+        "internalName": "Samehadaku",
+        "description": "Nonton anime sub indo dari Samehadaku",
+        "url": "https://raw.githubusercontent.com/mbelosai1/anime-indo-cloudstream/builds/Samehadaku.cs3",
+        "name": "Samehadaku"
+    }
+]
