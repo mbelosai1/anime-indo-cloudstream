@@ -26,12 +26,35 @@ class Samehadaku : MainAPI() {
 
     override val mainPage = mainPageOf(
         "anime-terbaru/page/%d/" to "Episode Terbaru",
+        "jadwal-rilis/" to "Anime Musim Ini",
         "daftar-anime-2/page/%d/?status=Currently+Airing&order=popular" to "Ongoing Populer",
-        "daftar-anime-2/page/%d/?status=Completed&order=popular" to "Completed Populer",
+        "daftar-anime-2/page/%d/?status=Currently+Airing&order=latest" to "Ongoing Terbaru Ditambahkan",
+        "daftar-anime-2/page/%d/?status=Finished+Airing&order=popular" to "Completed Populer",
+        "daftar-anime-2/page/%d/?status=Finished+Airing&order=update" to "Completed Terbaru",
         "daftar-anime-2/page/%d/?type=Movie&order=update" to "Movie",
+        "daftar-anime-2/page/%d/?type=OVA&order=update" to "OVA",
+        "daftar-anime-2/page/%d/?type=Special&order=update" to "Special",
+        // The site's own /genre/ pages ignore the genre, but the anime list filter honours it.
+        "daftar-anime-2/page/%d/?genre[]=action&order=popular" to "Action",
+        "daftar-anime-2/page/%d/?genre[]=adventure&order=popular" to "Adventure",
+        "daftar-anime-2/page/%d/?genre[]=comedy&order=popular" to "Comedy",
+        "daftar-anime-2/page/%d/?genre[]=fantasy&order=popular" to "Fantasy",
+        "daftar-anime-2/page/%d/?genre[]=isekai&order=popular" to "Isekai",
+        "daftar-anime-2/page/%d/?genre[]=romance&order=popular" to "Romance",
+        "daftar-anime-2/page/%d/?genre[]=school&order=popular" to "School",
+        "daftar-anime-2/page/%d/?genre[]=slice-of-life&order=popular" to "Slice of Life",
+        "daftar-anime-2/page/%d/?genre[]=sports&order=popular" to "Sports",
+        "daftar-anime-2/page/%d/?genre[]=mystery&order=popular" to "Mystery",
+        "daftar-anime-2/page/%d/?genre[]=sci-fi&order=popular" to "Sci-Fi",
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
+        // The release schedule is a single page of everything airing this season.
+        if (request.data == "jadwal-rilis/") {
+            if (page > 1) return newHomePageResponse(request.name, emptyList(), false)
+            val cards = getDoc("$mainUrl/jadwal-rilis/").select("div.animposx").mapNotNull { it.toCard() }.distinctBy { it.url }
+            return newHomePageResponse(request.name, cards, false)
+        }
         val doc = getDoc("$mainUrl/${request.data.format(page)}")
         val latest = doc.select("div.post-show ul li").mapNotNull { it.toLatest() }
         // Latest-episode thumbnails are 16:9 screenshots, so show that row with wide cards.
