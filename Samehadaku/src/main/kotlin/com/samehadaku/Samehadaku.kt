@@ -2,7 +2,11 @@ package com.samehadaku
 
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.network.CloudflareKiller
+import com.lagradost.cloudstream3.LoadResponse.Companion.addDuration
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
+import com.lagradost.cloudstream3.utils.getQualityFromName
+import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -29,9 +33,20 @@ class Samehadaku : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val doc = getDoc("$mainUrl/${request.data.format(page)}")
-        val items = doc.select("div.post-show ul li").mapNotNull { it.toLatest() } +
-                doc.select("article.animepost").mapNotNull { it.toCard() }
-        return newHomePageResponse(request.name, items)
+        val latest = doc.select("div.post-show ul li").mapNotNull { it.toLatest() }
+        // Latest-episode thumbnails are 16:9 screenshots, so show that row with wide cards.
+        if (latest.isNotEmpty()) return newHomePageResponse(HomePageList(request.name, latest, true))
+        return newHomePageResponse(request.name, doc.select("article.animepost").mapNotNull { it.toCard() })
+    }
+
+    // WordPress serves resized copies like "Foo-213x300.jpg"; the original is much sharper.
+    private fun fullImage(url: String?) = url?.replace(Regex("""-\d+x\d+(\.\w+)$"""), "$1")
+
+    private fun typeOf(text: String?) = when {
+        text == null -> TvType.Anime
+        text.contains("Movie", true) -> TvType.AnimeMovie
+        text.contains("OVA", true) || text.contains("ONA", true) || text.contains("Special", true) -> TvType.OVA
+        else -> TvType.Anime
     }
 
     // "Episode Terbaru" rows: the title link already points at the series page.
@@ -39,7 +54,7 @@ class Samehadaku : MainAPI() {
         val a = selectFirst("h2.entry-title a") ?: return null
         val ep = selectFirst("span:has(b:containsOwn(Episode))")?.ownText()?.trim()?.toIntOrNull()
         return newAnimeSearchResponse(a.text().trim(), a.attr("href"), TvType.Anime) {
-            posterUrl = selectFirst("img")?.attr("src")
+            posterUrl = fullImage(selectFirst("img")?.attr("src"))
             addSub(ep)
         }
     }
@@ -47,8 +62,9 @@ class Samehadaku : MainAPI() {
     private fun Element.toCard(): SearchResponse? {
         val a = selectFirst("a") ?: return null
         val title = selectFirst("h2")?.text()?.trim() ?: a.attr("title")
-        return newAnimeSearchResponse(title, toSeriesUrl(a.attr("href")), TvType.Anime) {
-            posterUrl = selectFirst("img")?.attr("src")
+        return newAnimeSearchResponse(title, toSeriesUrl(a.attr("href")), typeOf(selectFirst("div.type")?.text())) {
+            posterUrl = fullImage(selectFirst("img")?.attr("src"))
+            score = Score.from10(selectFirst("div.score")?.text()?.let { Regex("""\d+(\.\d+)?""").find(it)?.value })
         }
     }
 
@@ -75,11 +91,7 @@ class Samehadaku : MainAPI() {
         fun info(label: String) = doc.select("span.w-28")
             .firstOrNull { it.text().trim().equals(label, true) }?.nextElementSibling()?.text()?.trim()
 
-        val type = when {
-            info("Type")?.contains("Movie", true) == true -> TvType.AnimeMovie
-            info("Type")?.contains("OVA", true) == true -> TvType.OVA
-            else -> TvType.Anime
-        }
+        val type = typeOf(info("Type"))
 
         // shortcut: the series page only lists the latest 100 episodes, older ones are not reachable from it.
         val episodes = doc.select("div.custom-scrollbar h4 a").map {
@@ -91,8 +103,14 @@ class Samehadaku : MainAPI() {
         }.distinctBy { it.data }.reversed()
 
         return newAnimeLoadResponse(title, url, type) {
-            posterUrl = doc.selectFirst("meta[property=og:image]")?.attr("content")
+            posterUrl = doc.selectFirst("img.object-cover")?.attr("src")
+                ?: doc.selectFirst("meta[property=og:image]")?.attr("content")
             plot = doc.selectFirst("div.entry-content")?.text()?.trim()
+            engName = info("English")
+            japName = info("Japanese")
+            // The score is the only leaf element on the page whose whole text is a number like "6.46".
+            score = Score.from10(doc.select("span, div").firstOrNull { it.children().isEmpty() && it.text().matches(Regex("""\d\.\d{1,2}""")) }?.text())
+            addDuration(info("Duration"))
             tags = doc.select("a[href*=/genre/]").map { it.text().trim() }.distinct()
             showStatus = when {
                 info("Status")?.contains("Completed", true) == true -> ShowStatus.Completed
@@ -112,6 +130,35 @@ class Samehadaku : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val doc = getDoc(data)
+
+        // Download mirrors, one <li> per quality. These play in CloudStream; the Mega/Blogger players mostly don't.
+        doc.select("li:has(div.download-eps-links)").amap { row ->
+            // Rows are grouped under a heading like "MKV", "MP4" or "x265 [...]".
+            val format = row.closest("div.download-eps")?.selectFirst("p b")?.text()?.substringBefore(" ").orEmpty()
+            val label = row.selectFirst("strong")?.text()?.trim().orEmpty()
+            val quality = when (label.uppercase()) {
+                "MP4HD" -> "720p"
+                "FULLHD" -> "1080p"
+                "4K" -> "2160p"
+                else -> label
+            }
+            row.select("div.download-eps-links a[href]").amap { a ->
+                val href = a.attr("href")
+                val pixeldrain = Regex("""pixeldrain\.com/u/(\w+)""").find(href)?.groupValues?.get(1)
+                when {
+                    // Pixeldrain's API serves the file itself, so no extractor round-trip is needed.
+                    pixeldrain != null -> callback(
+                        newExtractorLink("Pixeldrain", "Pixeldrain $format $label","https://pixeldrain.com/api/file/$pixeldrain", ExtractorLinkType.VIDEO) {
+                            this.quality = getQualityFromName(quality)
+                        }
+                    )
+                    // RAR archives can't be played.
+                    href.contains("mediafire", true) -> {}
+                    else -> loadExtractor(href, data, subtitleCallback, callback)
+                }
+            }
+        }
+
         doc.select("div#server ul li div.player-server-btn").amap { server ->
             // Servers carry the iframe in data-embed; older posts use the theme's player_ajax endpoint instead.
             val embed = server.attr("data-embed").ifBlank {
