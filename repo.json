@@ -1,0 +1,8 @@
+{
+  "name": "Samehadaku Repo",
+  "description": "CloudStream repository untuk Samehadaku",
+  "manifestVersion": 1,
+  "pluginLists": [
+    "https://raw.githubusercontent.com/mbelosai1/samehadaku-cloudstream/builds/plugins.json"
+  ]
+}
