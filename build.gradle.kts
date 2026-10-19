@@ -38,11 +38,11 @@ subprojects {
 
     cloudstream {
         // when running through github workflow, GITHUB_REPOSITORY should contain current repository name
-        setRepo(System.getenv("GITHUB_REPOSITORY") ?: "mbelosai1/samehadaku-cloudstream")
+        setRepo(System.getenv("GITHUB_REPOSITORY") ?: "mbelosai1/anime-indo-cloudstream")
     }
 
     android {
-        namespace = "com.samehadaku"
+        namespace = "com.${project.name.lowercase()}"
 
         defaultConfig {
             minSdk = 21
