@@ -111,7 +111,8 @@ class Samehadaku : MainAPI() {
             // The score is the only leaf element on the page whose whole text is a number like "6.46".
             score = Score.from10(doc.select("span, div").firstOrNull { it.children().isEmpty() && it.text().matches(Regex("""\d\.\d{1,2}""")) }?.text())
             addDuration(info("Duration"))
-            tags = doc.select("a[href*=/genre/]").map { it.text().trim() }.distinct()
+            // Only the first genre block belongs to this anime; the sidebar has its own genre links.
+            tags = doc.selectFirst("a[href*=/genre/]")?.parent()?.select("a[href*=/genre/]")?.map { it.text().trim() }
             showStatus = when {
                 info("Status")?.contains("Completed", true) == true -> ShowStatus.Completed
                 info("Status")?.contains("Ongoing", true) == true ||
